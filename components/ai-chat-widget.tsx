@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Send, Bot, User, Loader2, CheckCircle, AlertCircle, Zap, Target, TrendingDown, Lock } from "lucide-react"
-import { isFinancialQuery } from "@/app/api/utils/simple-rbac"
+import { isFinancialOnlyQuery } from "@/app/api/utils/simple-rbac"
 
 interface Message {
   id: string
@@ -165,7 +165,7 @@ export function AIChatWidget({ deskId, deskName, initialContext, anomalyData, on
     const normalizedRole = userRole?.toLowerCase()
 
     // 🔒 FRONTEND RBAC: Block financial queries for sales users BEFORE sending to backend
-    if (normalizedRole === "sales" && isFinancialQuery(message)) {
+    if (normalizedRole === "sales" && isFinancialOnlyQuery(message)) {
       console.warn(`[AI-CHAT] Frontend RBAC: Sales user blocked from financial query: "${message}"`)
       setError({
         error: "Access Restricted",
