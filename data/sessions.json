@@ -1,12 +1,12 @@
 {
   "sessions": [
     {
-      "sessionId": "session_1776495972323",
+      "sessionId": "session_1776497196739",
       "email": "abhinav@goldmansachs.com",
       "role": "Financial",
       "name": "Abhinav",
-      "loginTime": "2026-04-18T07:06:12.323Z",
-      "lastActivityTime": "2026-04-18T07:06:15.593Z",
+      "loginTime": "2026-04-18T07:26:36.739Z",
+      "lastActivityTime": "2026-04-18T07:26:39.318Z",
       "isActive": true
     }
   ]

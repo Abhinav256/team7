@@ -14,21 +14,34 @@ interface Session {
   isActive: boolean
 }
 
-interface SessionsData {
-  sessions: Session[]
-}
+// Global variable to persist sessions in memory across lambda invocations (if reused)
+// This is used as a fallback because Vercel's filesystem is read-only at runtime
+let sessionsMemory: SessionsData | null = null;
 
 async function getSessions(): Promise<SessionsData> {
+  if (sessionsMemory) {
+    return sessionsMemory;
+  }
+  
   try {
     const data = await fs.readFile(SESSIONS_FILE, 'utf-8')
-    return JSON.parse(data)
+    sessionsMemory = JSON.parse(data)
+    return sessionsMemory!
   } catch {
-    return { sessions: [] }
+    sessionsMemory = { sessions: [] }
+    return sessionsMemory
   }
 }
 
 async function saveSessions(data: SessionsData): Promise<void> {
-  await fs.writeFile(SESSIONS_FILE, JSON.stringify(data, null, 2))
+  sessionsMemory = data;
+  try {
+    await fs.writeFile(SESSIONS_FILE, JSON.stringify(data, null, 2))
+  } catch (error) {
+    // On Vercel, this will fail. We log it but don't throw an error 
+    // because we've already updated the in-memory cache.
+    console.warn('[SESSION API] Persisting to filesystem failed (read-only FS). Using in-memory fallback.')
+  }
 }
 
 export async function POST(req: NextRequest) {

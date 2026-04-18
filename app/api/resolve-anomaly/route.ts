@@ -4,12 +4,21 @@ import path from "path"
 
 const TRADING_FILE = path.join(process.cwd(), "data", "trading_desks.json")
 
+// Global memory cache for Vercel compatibility (filesystem is read-only)
+let tradingMemory: any = null;
+
 export async function POST(request: Request) {
   try {
     const { desk_id } = await request.json()
 
-    const raw = await fs.readFile(TRADING_FILE, 'utf8')
-    const trading = JSON.parse(raw)
+    let trading: any;
+    if (tradingMemory) {
+      trading = tradingMemory;
+    } else {
+      const raw = await fs.readFile(TRADING_FILE, 'utf8')
+      trading = JSON.parse(raw)
+      tradingMemory = trading;
+    }
 
     const deskIndex = trading.tradingDesks.findIndex((d: any) => d.desk_id === desk_id)
     if (deskIndex === -1) {
@@ -40,7 +49,11 @@ export async function POST(request: Request) {
     }
 
     // Persist file
-    await fs.writeFile(TRADING_FILE, JSON.stringify(trading, null, 2), 'utf8')
+    try {
+      await fs.writeFile(TRADING_FILE, JSON.stringify(trading, null, 2), 'utf8')
+    } catch (err) {
+      console.warn('[RESOLVE API] Persisting to filesystem failed (read-only FS). Using in-memory fallback.')
+    }
 
     const result = {
       desk_id: desk.desk_id,

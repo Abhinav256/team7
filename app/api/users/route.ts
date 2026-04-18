@@ -4,17 +4,31 @@ import path from "path"
 
 const USERS_FILE = path.join(process.cwd(), "data", "users.json")
 
+// Global memory cache for Vercel compatibility (filesystem is read-only)
+let usersMemory: any = null;
+
 async function readUsers() {
+  if (usersMemory) {
+    return usersMemory;
+  }
+  
   try {
     const raw = await fs.readFile(USERS_FILE, "utf8")
-    return JSON.parse(raw)
+    usersMemory = JSON.parse(raw)
+    return usersMemory
   } catch (err) {
-    return { users: [] }
+    usersMemory = { users: [] }
+    return usersMemory
   }
 }
 
 async function writeUsers(data: any) {
-  await fs.writeFile(USERS_FILE, JSON.stringify(data, null, 2), "utf8")
+  usersMemory = data;
+  try {
+    await fs.writeFile(USERS_FILE, JSON.stringify(data, null, 2), "utf8")
+  } catch (err) {
+    console.warn('[USERS API] Persisting to filesystem failed (read-only FS). Using in-memory fallback.')
+  }
 }
 
 export async function GET() {
