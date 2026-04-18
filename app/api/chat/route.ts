@@ -72,12 +72,12 @@ async function getUserRoleFromSession(req: Request): Promise<UserRole> {
   try {
     const cookieStore = await cookies()
     let sessionId = cookieStore.get("gs_session_id")?.value
-    
+
     // Also check X-Session-ID header
     if (!sessionId) {
       sessionId = (req.headers.get("X-Session-ID") || req.headers.get("x-session-id")) || undefined
     }
-    
+
     if (!sessionId) {
       console.log("[SECURITY] No session found, defaulting to unknown")
       return "unknown"
@@ -87,7 +87,7 @@ async function getUserRoleFromSession(req: Request): Promise<UserRole> {
 
     // Look up session in sessions.json
     const session = (sessionsData as any).sessions.find((s: any) => s.sessionId === sessionId)
-    
+
     if (session) {
       const role = session.role.toLowerCase() === "financial" ? "trader" : session.role.toLowerCase() === "sales" ? "sales" : "admin"
       console.log(`[SECURITY] User role from session: ${role}`)
@@ -143,7 +143,7 @@ function authorizeQuery(userRole: UserRole, query: string): { allowed: boolean; 
         console.log(`[SECURITY] BLOCKED: Trader user querying "${keyword}"`)
         return {
           allowed: false,
-          message: "This information is not available in your dashboard."
+          message: "Your access to this data is restricted."
         }
       }
     }

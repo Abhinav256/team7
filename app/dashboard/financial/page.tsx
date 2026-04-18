@@ -643,23 +643,152 @@ export default function FinancialDashboardPage() {
             </Dialog>
 
             <Dialog open={showResolutionPopup} onOpenChange={(open) => !open && setShowResolutionPopup(false)}>
-              <DialogContent className="success-dialog bg-slate-950 text-white border border-slate-700 rounded-3xl shadow-2xl max-w-sm">
+              <DialogContent className="bg-transparent border-0 shadow-none max-w-md p-0 overflow-visible [&>button]:hidden">
                 <DialogHeader>
-                  <DialogTitle className="sr-only">Resolution Successful</DialogTitle>
+                  <DialogTitle className="sr-only">Anomaly Cleared</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4 p-6 text-center">
-                  <h2 className="text-2xl font-semibold">✅ Resolution Successful</h2>
-                  <p className="text-slate-300">Anomaly successfully resolved.</p>
-                  <Button
-                    className="mt-4 w-full"
-                    onClick={async () => {
-                      setShowResolutionPopup(false)
-                      await fetchTradingDesks()
-                      await fetchAnomalies()
-                    }}
-                  >
-                    OK
-                  </Button>
+                <style jsx>{`
+                  @keyframes popScale {
+                    0% { transform: scale(0.3) rotate(-10deg); opacity: 0; }
+                    50% { transform: scale(1.08) rotate(2deg); opacity: 1; }
+                    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+                  }
+                  @keyframes checkDraw {
+                    0% { stroke-dashoffset: 100; }
+                    100% { stroke-dashoffset: 0; }
+                  }
+                  @keyframes ringPulse {
+                    0% { transform: scale(0.8); opacity: 0; }
+                    50% { transform: scale(1); opacity: 1; }
+                    100% { transform: scale(1.5); opacity: 0; }
+                  }
+                  @keyframes shimmer {
+                    0% { background-position: -200% 0; }
+                    100% { background-position: 200% 0; }
+                  }
+                  @keyframes particleFly1 {
+                    0% { transform: translate(0, 0) scale(1); opacity: 1; }
+                    100% { transform: translate(-80px, -120px) scale(0); opacity: 0; }
+                  }
+                  @keyframes particleFly2 {
+                    0% { transform: translate(0, 0) scale(1); opacity: 1; }
+                    100% { transform: translate(90px, -100px) scale(0); opacity: 0; }
+                  }
+                  @keyframes particleFly3 {
+                    0% { transform: translate(0, 0) scale(1); opacity: 1; }
+                    100% { transform: translate(-60px, 80px) scale(0); opacity: 0; }
+                  }
+                  @keyframes particleFly4 {
+                    0% { transform: translate(0, 0) scale(1); opacity: 1; }
+                    100% { transform: translate(70px, 90px) scale(0); opacity: 0; }
+                  }
+                  @keyframes particleFly5 {
+                    0% { transform: translate(0, 0) scale(1); opacity: 1; }
+                    100% { transform: translate(-100px, -40px) scale(0); opacity: 0; }
+                  }
+                  @keyframes particleFly6 {
+                    0% { transform: translate(0, 0) scale(1); opacity: 1; }
+                    100% { transform: translate(110px, -50px) scale(0); opacity: 0; }
+                  }
+                  .popup-container {
+                    animation: popScale 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+                  }
+                  .check-icon {
+                    animation: checkDraw 0.8s ease-out 0.3s forwards;
+                    stroke-dasharray: 100;
+                    stroke-dashoffset: 100;
+                  }
+                  .ring-pulse {
+                    animation: ringPulse 1.5s ease-out 0.2s infinite;
+                  }
+                  .shimmer-text {
+                    background: linear-gradient(90deg, #34d399, #6ee7b7, #a7f3d0, #6ee7b7, #34d399);
+                    background-size: 200% auto;
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    animation: shimmer 3s linear infinite;
+                  }
+                  .particle {
+                    position: absolute;
+                    border-radius: 50%;
+                    pointer-events: none;
+                  }
+                  .p1 { animation: particleFly1 1.2s ease-out 0.4s forwards; background: #34d399; width: 8px; height: 8px; top: 50%; left: 50%; }
+                  .p2 { animation: particleFly2 1.0s ease-out 0.5s forwards; background: #6ee7b7; width: 6px; height: 6px; top: 50%; left: 50%; }
+                  .p3 { animation: particleFly3 1.3s ease-out 0.3s forwards; background: #a78bfa; width: 7px; height: 7px; top: 50%; left: 50%; }
+                  .p4 { animation: particleFly4 1.1s ease-out 0.6s forwards; background: #fbbf24; width: 5px; height: 5px; top: 50%; left: 50%; }
+                  .p5 { animation: particleFly5 1.4s ease-out 0.35s forwards; background: #60a5fa; width: 6px; height: 6px; top: 50%; left: 50%; }
+                  .p6 { animation: particleFly6 1.0s ease-out 0.45s forwards; background: #f472b6; width: 8px; height: 8px; top: 50%; left: 50%; }
+                `}</style>
+                <div className="popup-container relative">
+                  {/* Particles */}
+                  <div className="particle p1" />
+                  <div className="particle p2" />
+                  <div className="particle p3" />
+                  <div className="particle p4" />
+                  <div className="particle p5" />
+                  <div className="particle p6" />
+
+                  <div className="relative bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border border-emerald-500/30 rounded-3xl shadow-2xl shadow-emerald-500/20 overflow-hidden">
+                    {/* Top gradient glow */}
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-gradient-to-b from-emerald-500/20 to-transparent rounded-full blur-3xl" />
+
+                    <div className="relative z-10 p-8 flex flex-col items-center text-center space-y-5">
+                      {/* Animated checkmark */}
+                      <div className="relative">
+                        <div className="ring-pulse absolute inset-0 w-24 h-24 rounded-full border-2 border-emerald-400/40" />
+                        <div className="w-24 h-24 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full flex items-center justify-center shadow-xl shadow-emerald-500/40">
+                          <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none">
+                            <path
+                              className="check-icon"
+                              d="M5 13l4 4L19 7"
+                              stroke="white"
+                              strokeWidth="3"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+
+                      {/* Title */}
+                      <div className="space-y-2">
+                        <h2 className="shimmer-text text-2xl font-bold tracking-tight">
+                          Anomaly Cleared
+                        </h2>
+                        <p className="text-slate-400 text-sm leading-relaxed max-w-xs">
+                          The P&L variance has been successfully reconciled. All market data and FX rates have been refreshed and validated.
+                        </p>
+                      </div>
+
+                      {/* Status badges */}
+                      <div className="flex items-center gap-3">
+                        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-full text-xs font-semibold text-emerald-400">
+                          <span className="w-2 h-2 bg-emerald-400 rounded-full" />
+                          Reconciled
+                        </span>
+                        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 border border-blue-500/30 rounded-full text-xs font-semibold text-blue-400">
+                          <span className="w-2 h-2 bg-blue-400 rounded-full" />
+                          Data Refreshed
+                        </span>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="w-full h-px bg-gradient-to-r from-transparent via-slate-700 to-transparent" />
+
+                      {/* Actions */}
+                      <Button
+                        className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-bold shadow-lg shadow-emerald-500/25 rounded-xl py-5 text-sm tracking-wide"
+                        onClick={async () => {
+                          setShowResolutionPopup(false)
+                          await fetchTradingDesks()
+                          await fetchAnomalies()
+                        }}
+                      >
+                        Continue to Dashboard
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </DialogContent>
             </Dialog>

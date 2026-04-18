@@ -1,8 +1,9 @@
-"use client"
+"use client";
 
 import { useState, useRef, useEffect } from "react"
 import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport } from "ai"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -38,7 +39,11 @@ export function ChatbotWidget() {
   const [userRole, setUserRole] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [failedMessageIds, setFailedMessageIds] = useState<Set<string>>(new Set())
+  const [showResolvedPopup, setShowResolvedPopup] = useState(false)
+  const [pendingClearMessages, setPendingClearMessages] = useState(false)
   const recognitionRef = useRef<any>(null)
+  const silenceTimeoutRef = useRef<any>(null)
+  const [isClosing, setIsClosing] = useState(false)
   const { pendingAnomaly, setPendingAnomaly, onAnomalyResolved } = useChatbot()
 
   // Get user role from session API on mount
@@ -82,14 +87,32 @@ export function ChatbotWidget() {
     recognition.onstart = () => {
       console.log("[CHATBOT] Voice dictation started")
       setIsListening(true)
+      setIsClosing(false)
+      // Start 5-second initial silence timeout
+      clearTimeout(silenceTimeoutRef.current)
+      silenceTimeoutRef.current = setTimeout(() => {
+        console.log("[CHATBOT] No speech detected for 5s, auto-stopping")
+        stopListeningWithAnimation()
+      }, 5000)
     }
 
     recognition.onend = () => {
       console.log("[CHATBOT] Voice dictation ended")
-      setIsListening(false)
+      clearTimeout(silenceTimeoutRef.current)
+      // Only set isListening false if not already closing (animation handles it)
+      if (!isClosing) {
+        setIsListening(false)
+      }
     }
 
     recognition.onresult = (event: any) => {
+      // Reset silence timeout on any speech activity
+      clearTimeout(silenceTimeoutRef.current)
+      silenceTimeoutRef.current = setTimeout(() => {
+        console.log("[CHATBOT] Silence detected for 2s after speech, auto-stopping")
+        stopListeningWithAnimation()
+      }, 2000)
+
       let interimTranscript = ""
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript
@@ -104,7 +127,7 @@ export function ChatbotWidget() {
     }
 
     recognition.onerror = (event: any) => {
-      // Silently handle error - don't log to console
+      clearTimeout(silenceTimeoutRef.current)
       if (event.error !== "aborted") {
         console.error("[CHATBOT] Speech recognition error:", event.error)
       }
@@ -114,6 +137,7 @@ export function ChatbotWidget() {
 
     // Cleanup function to abort recognition on unmount
     return () => {
+      clearTimeout(silenceTimeoutRef.current)
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort()
@@ -123,6 +147,22 @@ export function ChatbotWidget() {
       }
     }
   }, [])
+
+  // Stop listening with a closing animation
+  const stopListeningWithAnimation = () => {
+    clearTimeout(silenceTimeoutRef.current)
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort()
+      } catch (e) {}
+    }
+    setIsClosing(true)
+    // Wait for the pop-out animation to finish before hiding
+    setTimeout(() => {
+      setIsListening(false)
+      setIsClosing(false)
+    }, 450)
+  }
 
   // Handle auto-send when listening ends
   useEffect(() => {
@@ -141,8 +181,7 @@ export function ChatbotWidget() {
     }
 
     if (isListening) {
-      recognitionRef.current.stop()
-      setIsListening(false)
+      stopListeningWithAnimation()
     } else {
       recognitionRef.current.start()
       setIsListening(true)
@@ -244,7 +283,7 @@ export function ChatbotWidget() {
     }
   }
 
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, setMessages, status } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
       fetch: async (resource, options) => {
@@ -291,12 +330,11 @@ export function ChatbotWidget() {
       const parsedError = parseErrorResponse(errorData)
       setError(parsedError)
       
-      // If this is a 403 authorization error, mark the last message as failed
-      // so it won't be displayed in the chat
+      // If this is a 403 authorization error, flag messages for clearing
+      // so the blocked query doesn't get re-sent with the next request
       if (parsedError.code === "403_FORBIDDEN") {
-        console.log("[CHATBOT] Marking failed authorization message")
-        // We'll filter out messages that don't have corresponding assistant responses
-        // by checking if the message is followed by an actual response
+        console.log("[CHATBOT] Flagging messages for clear after 403")
+        setPendingClearMessages(true)
       }
     },
     onFinish: (result) => {
@@ -317,6 +355,15 @@ export function ChatbotWidget() {
       }
     },
   })
+
+  // Clear messages after 403 error - done via useEffect to avoid stale closure in onError
+  useEffect(() => {
+    if (pendingClearMessages) {
+      console.log("[CHATBOT] Clearing messages after 403 authorization failure")
+      setMessages([])
+      setPendingClearMessages(false)
+    }
+  }, [pendingClearMessages, setMessages])
 
   // Custom submit handler
   const handleSubmit = (e: React.FormEvent) => {
@@ -372,7 +419,7 @@ export function ChatbotWidget() {
 **Root Causes Identified:**
 ${pendingAnomaly.root_causes.map((cause) => `- ${cause}`).join('\n')}
 
-Please provide a detailed analysis and solution recommendations. After analysis, confirm if you're ready to proceed with automated resolution.`
+Please provide a brief, simple summary (2-3 sentences max) of the issue and confirm if you are ready to proceed with automated resolution.`
 
       setComparisonData(null)
       console.log("[CHATBOT] Sending anomaly message to AI...")
@@ -441,15 +488,8 @@ Please provide a detailed analysis and solution recommendations. After analysis,
           // Wait a moment for API to complete
           await new Promise(resolve => setTimeout(resolve, 500))
 
-          try {
-            const anomaliesResponse = await fetch('/api/anomalies')
-            const anomaliesData = await anomaliesResponse.json()
-            anomalyStateService.updateAnomalyCount(anomaliesData.anomalies.length)
-          } catch (error) {
-            console.error('[CHATBOT] Failed to refresh anomaly count:', error)
-          }
-
           // Call the refresh callback to update dashboard
+          // (dashboard handles anomaly count updates internally)
           if (onAnomalyResolved && typeof onAnomalyResolved === 'function') {
             try {
               await onAnomalyResolved()
@@ -464,6 +504,7 @@ Please provide a detailed analysis and solution recommendations. After analysis,
         setProgress(0)
         setPendingAnomaly(null)
         setIsAnomalyMode(false)
+        setShowResolvedPopup(true)
       }
     }
 
@@ -621,6 +662,55 @@ Please provide a detailed analysis and solution recommendations. After analysis,
         .close-btn:hover {
           animation: rotateClose 0.6s ease-in-out;
         }
+
+        /* Progress Bar Shimmer */
+        @keyframes shimmerSlide {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+
+        /* Resolve Popup Animations */
+        @keyframes resolvePopIn {
+          0% { transform: scale(0.3) rotate(-8deg); opacity: 0; }
+          60% { transform: scale(1.06) rotate(1deg); opacity: 1; }
+          100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        @keyframes resolveCheckDraw {
+          0% { stroke-dashoffset: 100; }
+          100% { stroke-dashoffset: 0; }
+        }
+        @keyframes resolveRingPulse {
+          0% { transform: scale(0.8); opacity: 0; }
+          50% { transform: scale(1); opacity: 0.8; }
+          100% { transform: scale(1.6); opacity: 0; }
+        }
+        @keyframes resolveShimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        @keyframes rp1 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(-70px,-110px) scale(0);opacity:0} }
+        @keyframes rp2 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(85px,-95px) scale(0);opacity:0} }
+        @keyframes rp3 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(-55px,75px) scale(0);opacity:0} }
+        @keyframes rp4 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(65px,85px) scale(0);opacity:0} }
+        @keyframes rp5 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(-95px,-35px) scale(0);opacity:0} }
+        @keyframes rp6 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(100px,-45px) scale(0);opacity:0} }
+        .resolve-popup { animation: resolvePopIn 0.6s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+        .resolve-check { animation: resolveCheckDraw 0.8s ease-out 0.3s forwards; stroke-dasharray:100; stroke-dashoffset:100; }
+        .resolve-ring { animation: resolveRingPulse 1.5s ease-out 0.2s infinite; }
+        .resolve-shimmer {
+          background: linear-gradient(90deg, #34d399, #6ee7b7, #a7f3d0, #6ee7b7, #34d399);
+          background-size: 200% auto;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          animation: resolveShimmer 3s linear infinite;
+        }
+        .rpt { position:absolute; border-radius:50%; pointer-events:none; }
+        .rp1 { animation:rp1 1.2s ease-out 0.4s forwards; background:#34d399; width:8px; height:8px; top:40%; left:50%; }
+        .rp2 { animation:rp2 1.0s ease-out 0.5s forwards; background:#6ee7b7; width:6px; height:6px; top:40%; left:50%; }
+        .rp3 { animation:rp3 1.3s ease-out 0.3s forwards; background:#a78bfa; width:7px; height:7px; top:40%; left:50%; }
+        .rp4 { animation:rp4 1.1s ease-out 0.6s forwards; background:#fbbf24; width:5px; height:5px; top:40%; left:50%; }
+        .rp5 { animation:rp5 1.4s ease-out 0.35s forwards; background:#60a5fa; width:6px; height:6px; top:40%; left:50%; }
+        .rp6 { animation:rp6 1.0s ease-out 0.45s forwards; background:#f472b6; width:8px; height:8px; top:40%; left:50%; }
       `}</style>
 
       {/* Listening Modal Popup with Cartoon Animation */}
@@ -628,9 +718,11 @@ Please provide a detailed analysis and solution recommendations. After analysis,
         <div 
           className="fixed inset-0 z-[60] flex items-center justify-center fade-in"
           style={{ backgroundColor: 'rgba(0, 0, 0, 0.55)' }}
+          onClick={stopListeningWithAnimation}
         >
           <div 
-            className="modal-enter relative bg-gradient-to-br from-red-950 via-slate-900 to-red-950 border-4 border-red-500 rounded-[40px] shadow-2xl shadow-red-500/70 p-12 flex flex-col items-center justify-center w-96 h-[430px]"
+            className={`${isClosing ? 'modal-exit' : 'modal-enter'} relative bg-gradient-to-br from-red-950 via-slate-900 to-red-950 border-4 border-red-500 rounded-[40px] shadow-2xl shadow-red-500/70 p-12 flex flex-col items-center justify-center w-96 h-[430px]`}
+            onClick={(e) => e.stopPropagation()}
           >
             
             {/* Animated Background Glow */}
@@ -638,12 +730,7 @@ Please provide a detailed analysis and solution recommendations. After analysis,
 
             {/* Close Button - Top Right */}
             <button
-              onClick={() => {
-                if (recognitionRef.current) {
-                  recognitionRef.current.abort()
-                  setIsListening(false)
-                }
-              }}
+              onClick={stopListeningWithAnimation}
               className="close-btn absolute top-5 right-5 z-20 w-12 h-12 bg-red-600 hover:bg-red-500 rounded-full flex items-center justify-center transition-all duration-200 hover:shadow-lg hover:shadow-red-500/60 cursor-pointer border-2 border-red-400 active:scale-95"
               title="Stop listening"
             >
@@ -659,12 +746,7 @@ Please provide a detailed analysis and solution recommendations. After analysis,
               <div className="relative flex items-center justify-center mt-2">
                 <div className="mic-glow absolute w-40 h-40 bg-gradient-to-br from-red-600 to-red-700 rounded-full"></div>
                 <button
-                  onClick={() => {
-                    if (recognitionRef.current) {
-                      recognitionRef.current.abort()
-                      setIsListening(false)
-                    }
-                  }}
+                  onClick={stopListeningWithAnimation}
                   className="relative w-32 h-32 bg-gradient-to-br from-red-600 to-red-800 rounded-full flex items-center justify-center shadow-2xl shadow-red-500/80 border-4 border-red-400 hover:from-red-500 hover:to-red-700 transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
                 >
                   <Mic className="w-16 h-16 text-white animate-bounce" style={{ animationDuration: '1.5s' }} />
@@ -692,7 +774,7 @@ Please provide a detailed analysis and solution recommendations. After analysis,
 
               {/* Hint Text */}
               <p className="text-red-200/70 text-sm font-medium leading-tight">
-                Click mic or X to stop
+                Tap to stop listening
               </p>
             </div>
           </div>
@@ -719,30 +801,30 @@ Please provide a detailed analysis and solution recommendations. After analysis,
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 no-scrollbar space-y-4">
             {error && (
               <div className="animate-in slide-in-from-top-4 duration-300">
-                <div className="bg-gradient-to-br from-red-950/80 via-red-900/60 to-orange-950/50 border border-red-700/60 rounded-xl backdrop-blur-md overflow-hidden shadow-2xl relative">
+                <div className="bg-gradient-to-br from-amber-950/70 via-yellow-900/40 to-orange-950/30 border border-amber-600/40 rounded-xl backdrop-blur-md overflow-hidden shadow-2xl relative">
                   {/* Decorative gradient overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-red-600/5 to-orange-600/5 pointer-events-none" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-amber-600/5 to-yellow-600/5 pointer-events-none" />
                   
                   <div className="p-6 space-y-4 relative z-10">
-                    {/* Exception Header with Multiple Icons */}
+                    {/* Exception Header */}
                     <div className="flex items-start gap-4">
                       <div className="flex gap-2 mt-0.5">
-                        <div className="p-2.5 bg-red-500/20 rounded-lg">
-                          <AlertTriangle className="w-5 h-5 text-red-400" />
+                        <div className="p-2.5 bg-amber-500/15 rounded-lg border border-amber-500/20">
+                          <AlertTriangle className="w-5 h-5 text-amber-400" />
                         </div>
-                        <div className="p-2.5 bg-red-500/10 rounded-lg">
-                          <Lock className="w-5 h-5 text-red-300" />
+                        <div className="p-2.5 bg-amber-500/10 rounded-lg border border-amber-500/10">
+                          <Lock className="w-5 h-5 text-amber-300/80" />
                         </div>
                       </div>
                       <div className="flex-1 pt-0.5">
-                        <h3 className="font-bold text-base bg-gradient-to-r from-red-200 via-red-100 to-orange-200 bg-clip-text text-transparent">
+                        <h3 className="font-bold text-base bg-gradient-to-r from-amber-200 via-yellow-100 to-orange-200 bg-clip-text text-transparent">
                           {error.error || "Access Exception"}
                         </h3>
-                        <p className="text-red-300/70 text-xs mt-1 font-medium uppercase tracking-widest">
-                          ⚠ Restricted Operation
+                        <p className="text-amber-300/60 text-xs mt-1 font-medium uppercase tracking-widest">
+                          ⚠ Exception
                         </p>
                         {error.code && (
-                          <p className="text-red-400/60 text-xs mt-1 font-mono">
+                          <p className="text-amber-400/50 text-xs mt-1 font-mono">
                             [{error.code}]
                           </p>
                         )}
@@ -750,21 +832,21 @@ Please provide a detailed analysis and solution recommendations. After analysis,
                     </div>
 
                     {/* Divider */}
-                    <div className="h-px bg-gradient-to-r from-red-700/0 via-red-700/40 to-red-700/0" />
+                    <div className="h-px bg-gradient-to-r from-amber-700/0 via-amber-600/30 to-amber-700/0" />
 
-                    {/* Exception Message - Plain text, no JSON */}
+                    {/* Exception Message */}
                     <div className="space-y-3">
                       <div>
-                        <p className="text-red-100/90 text-sm leading-relaxed font-medium">
+                        <p className="text-amber-100/90 text-sm leading-relaxed font-medium">
                           {error.message || "You don't have permission to access this resource."}
                         </p>
                       </div>
 
                       {/* Exception Details Box */}
                       {error.details && (
-                        <div className="bg-red-900/30 border border-red-700/40 rounded-lg p-3">
-                          <p className="text-red-300/80 text-xs leading-relaxed font-mono">
-                            <span className="text-red-400 mr-2">→</span>{error.details}
+                        <div className="bg-amber-900/20 border border-amber-700/30 rounded-lg p-3">
+                          <p className="text-amber-300/70 text-xs leading-relaxed font-mono">
+                            <span className="text-amber-400 mr-2">→</span>{error.details}
                           </p>
                         </div>
                       )}
@@ -772,8 +854,8 @@ Please provide a detailed analysis and solution recommendations. After analysis,
                       {/* Exception Type Badge */}
                       {error.type && (
                         <div className="flex flex-wrap gap-2 pt-1">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-red-900/40 border border-red-700/50 rounded-md text-xs font-mono text-red-300">
-                            <span className="w-2 h-2 bg-red-400 rounded-full animate-pulse" />
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-900/30 border border-amber-600/40 rounded-md text-xs font-mono text-amber-300">
+                            <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
                             {error.type}
                           </span>
                         </div>
@@ -781,12 +863,12 @@ Please provide a detailed analysis and solution recommendations. After analysis,
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex justify-end gap-2 pt-2 border-t border-red-700/30">
+                    <div className="flex justify-end gap-2 pt-2 border-t border-amber-700/20">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setError(null)}
-                        className="border-red-600/50 text-red-200 hover:bg-red-900/40 hover:text-red-100 hover:border-red-500/70 transition-all duration-200 mt-3"
+                        className="border-amber-600/40 text-amber-200 hover:bg-amber-900/30 hover:text-amber-100 hover:border-amber-500/60 transition-all duration-200 mt-3"
                       >
                         Dismiss
                       </Button>
@@ -797,7 +879,7 @@ Please provide a detailed analysis and solution recommendations. After analysis,
                           setInput("");
                           setError(null);
                         }}
-                        className="text-red-300 hover:bg-red-900/50 hover:text-red-100 transition-all duration-200 mt-3"
+                        className="text-amber-300 hover:bg-amber-900/40 hover:text-amber-100 transition-all duration-200 mt-3"
                       >
                         Clear & Retry
                       </Button>
@@ -869,22 +951,54 @@ Please provide a detailed analysis and solution recommendations. After analysis,
 
                     {currentAnomalyId === pendingAnomaly?.desk_id && resolving && (
                       <div className="space-y-2">
-                        <div className="w-full bg-slate-700/50 rounded-full overflow-hidden h-3 shadow-lg border border-slate-600/50">
+                        <div className="w-full bg-slate-800/80 rounded-full overflow-hidden h-4 shadow-lg border border-slate-600/40 relative">
+                          {/* Animated glow behind the bar */}
                           <div 
-                            className="h-3 transition-all duration-300 rounded-full shadow-md"
+                            className="absolute top-0 left-0 h-4 rounded-full blur-sm opacity-60"
                             style={{ 
                               width: `${progress}%`,
-                              background: progress < 33 
-                                ? 'linear-gradient(90deg, #3b82f6, #06b6d4)' 
-                                : progress < 66
-                                ? 'linear-gradient(90deg, #06b6d4, #10b981)'
-                                : 'linear-gradient(90deg, #10b981, #34d399)',
+                              background: `linear-gradient(90deg, 
+                                #3b82f6 0%, 
+                                #06b6d4 ${Math.min(progress * 1.5, 100)}%, 
+                                #10b981 ${Math.min(progress * 2, 100)}%, 
+                                #34d399 100%)`,
                             }} 
                           />
+                          {/* Main progress bar */}
+                          <div 
+                            className="h-4 transition-all duration-200 rounded-full relative overflow-hidden"
+                            style={{ 
+                              width: `${progress}%`,
+                              background: `linear-gradient(90deg, 
+                                #3b82f6, 
+                                #6366f1 ${20}%, 
+                                #8b5cf6 ${35}%, 
+                                #06b6d4 ${50}%, 
+                                #14b8a6 ${70}%, 
+                                #10b981 ${85}%, 
+                                #34d399 100%)`,
+                            }} 
+                          >
+                            {/* Shimmer overlay */}
+                            <div 
+                              className="absolute inset-0 opacity-30"
+                              style={{
+                                background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)',
+                                backgroundSize: '200% 100%',
+                                animation: 'shimmerSlide 1.5s linear infinite',
+                              }}
+                            />
+                          </div>
                         </div>
                         <div className="flex items-center justify-between">
-                          <p className="text-xs text-slate-300 font-medium">Resolving anomaly...</p>
-                          <span className="text-xs font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                          <p className="text-xs text-slate-300 font-medium">
+                            {progress < 25 ? 'Identifying affected instruments...' 
+                              : progress < 50 ? 'Refreshing market data & FX rates...' 
+                              : progress < 75 ? 'Recalculating valuations...' 
+                              : progress < 100 ? 'Finalizing reconciliation...'
+                              : 'Complete!'}
+                          </p>
+                          <span className="text-xs font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent">
                             {Math.round(progress)}%
                           </span>
                         </div>
@@ -947,6 +1061,85 @@ Please provide a detailed analysis and solution recommendations. After analysis,
           </form>
         </CardContent>
       </Card>
+
+      {/* Anomaly Resolved Success Popup */}
+      {showResolvedPopup && (
+        <div 
+          className="fixed inset-0 z-[70] flex items-center justify-center fade-in"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
+          onClick={() => setShowResolvedPopup(false)}
+        >
+          <div 
+            className="resolve-popup relative max-w-sm w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Particles */}
+            <div className="rpt rp1" />
+            <div className="rpt rp2" />
+            <div className="rpt rp3" />
+            <div className="rpt rp4" />
+            <div className="rpt rp5" />
+            <div className="rpt rp6" />
+
+            <div className="relative bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border border-emerald-500/30 rounded-3xl shadow-2xl shadow-emerald-500/20 overflow-hidden">
+              {/* Top glow */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-24 bg-gradient-to-b from-emerald-500/25 to-transparent rounded-full blur-3xl" />
+
+              <div className="relative z-10 p-8 flex flex-col items-center text-center space-y-5">
+                {/* Animated checkmark */}
+                <div className="relative">
+                  <div className="resolve-ring absolute inset-0 w-20 h-20 rounded-full border-2 border-emerald-400/40" />
+                  <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full flex items-center justify-center shadow-xl shadow-emerald-500/40">
+                    <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none">
+                      <path
+                        className="resolve-check"
+                        d="M5 13l4 4L19 7"
+                        stroke="white"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Title */}
+                <div className="space-y-2">
+                  <h2 className="resolve-shimmer text-xl font-bold tracking-tight">
+                    Anomaly Cleared
+                  </h2>
+                  <p className="text-slate-400 text-xs leading-relaxed max-w-[240px]">
+                    P&L variance reconciled successfully. Market data and FX rates have been refreshed.
+                  </p>
+                </div>
+
+                {/* Status badges */}
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded-full text-[10px] font-semibold text-emerald-400">
+                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" />
+                    Reconciled
+                  </span>
+                  <span className="flex items-center gap-1 px-2.5 py-1 bg-blue-500/10 border border-blue-500/30 rounded-full text-[10px] font-semibold text-blue-400">
+                    <span className="w-1.5 h-1.5 bg-blue-400 rounded-full" />
+                    Refreshed
+                  </span>
+                </div>
+
+                {/* Divider */}
+                <div className="w-full h-px bg-gradient-to-r from-transparent via-slate-700 to-transparent" />
+
+                {/* Button */}
+                <Button
+                  className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-bold shadow-lg shadow-emerald-500/25 rounded-xl py-4 text-xs tracking-wide"
+                  onClick={() => setShowResolvedPopup(false)}
+                >
+                  Continue
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

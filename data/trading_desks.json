@@ -20,7 +20,7 @@
       "pnl_reported": 105.8,
       "pnl_expected": 105.8,
       "variance": 0,
-      "last_updated": "2026-04-16T10:18:30.172Z"
+      "last_updated": "2026-04-18T05:49:53.406Z"
     },
     {
       "desk_id": "D003",
@@ -42,7 +42,7 @@
       "pnl_reported": 9.1,
       "pnl_expected": 9.1,
       "variance": 0,
-      "last_updated": "2026-04-15T12:04:25.047Z"
+      "last_updated": "2026-04-18T06:03:11.178Z"
     },
     {
       "desk_id": "D005",
@@ -75,7 +75,7 @@
       "pnl_reported": 122.8,
       "pnl_expected": 122.8,
       "variance": 0,
-      "last_updated": "2026-04-14T15:40:18.485Z"
+      "last_updated": "2026-04-18T06:36:52.172Z"
     },
     {
       "desk_id": "D008",
@@ -108,7 +108,7 @@
       "pnl_reported": 92.1,
       "pnl_expected": 92.1,
       "variance": 0,
-      "last_updated": "2026-04-15T11:52:00.480Z"
+      "last_updated": "2026-04-18T06:39:31.471Z"
     },
     {
       "desk_id": "D011",
@@ -145,25 +145,25 @@
     },
     {
       "desk_id": "D014",
-      "desk_name": "Commodity Futures - Houston",
+      "desk_name": "Volatility Trading - Chicago",
       "region": "USA",
-      "type": "Commodities",
-      "status": "Reconciled",
-      "pnl_reported": 41.2,
-      "pnl_expected": 41.2,
-      "variance": 0,
-      "last_updated": "2026-04-14T05:58:03.568Z"
+      "type": "Options",
+      "status": "Anomaly",
+      "pnl_reported": 27.9,
+      "pnl_expected": 30.5,
+      "variance": -2.6,
+      "last_updated": "2026-04-17T11:50:00.000Z"
     },
     {
       "desk_id": "D015",
-      "desk_name": "Credit Derivatives - London",
+      "desk_name": "Asset Management - London",
       "region": "UK",
-      "type": "Derivatives",
-      "status": "Reconciled",
-      "pnl_reported": 71.5,
-      "pnl_expected": 71.5,
-      "variance": 0,
-      "last_updated": "2026-04-14T06:23:40.968Z"
+      "type": "Equities",
+      "status": "Anomaly",
+      "pnl_reported": 19.8,
+      "pnl_expected": 22.3,
+      "variance": -2.5,
+      "last_updated": "2026-04-17T12:15:00.000Z"
     },
     {
       "desk_id": "D016",
@@ -181,11 +181,11 @@
       "desk_name": "Emerging Markets FX - Singapore",
       "region": "APAC",
       "type": "FX",
-      "status": "Anomaly",
-      "pnl_reported": 25.7,
+      "status": "Reconciled",
+      "pnl_reported": 28.2,
       "pnl_expected": 28.2,
-      "variance": -2.5,
-      "last_updated": "2026-04-16T11:25:00.000Z"
+      "variance": 0,
+      "last_updated": "2026-04-18T05:27:41.914Z"
     },
     {
       "desk_id": "D018",
@@ -201,8 +201,8 @@
   ],
   "summary": {
     "totalDesks": 128,
-    "reconciled": 90,
-    "pending": 39,
-    "anomalies": 1
+    "reconciled": 91,
+    "pending": 37,
+    "anomalies": 0
   }
 }

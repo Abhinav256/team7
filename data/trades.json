@@ -54,6 +54,72 @@
       "currency": "JPY",
       "trade_date": "2026-04-11",
       "pnl_impact": 0.2
+    },
+    {
+      "trade_id": "T1006",
+      "desk_id": "D007",
+      "instrument": "SPX Options",
+      "type": "Derivative",
+      "quantity": 50000,
+      "price": 42.8,
+      "currency": "USD",
+      "trade_date": "2026-04-17",
+      "pnl_impact": -8.3
+    },
+    {
+      "trade_id": "T1007",
+      "desk_id": "D007",
+      "instrument": "NVDA",
+      "type": "Equity",
+      "quantity": 15000,
+      "price": 892.5,
+      "currency": "USD",
+      "trade_date": "2026-04-17",
+      "pnl_impact": -3.1
+    },
+    {
+      "trade_id": "T1008",
+      "desk_id": "D010",
+      "instrument": "VIX Futures",
+      "type": "Futures",
+      "quantity": 25000,
+      "price": 18.4,
+      "currency": "USD",
+      "trade_date": "2026-04-17",
+      "pnl_impact": -6.2
+    },
+    {
+      "trade_id": "T1009",
+      "desk_id": "D010",
+      "instrument": "SPX Options",
+      "type": "Option",
+      "quantity": 30000,
+      "price": 55.2,
+      "currency": "USD",
+      "trade_date": "2026-04-17",
+      "pnl_impact": -4.5
+    },
+    {
+      "trade_id": "T1010",
+      "desk_id": "D015",
+      "instrument": "CDX IG Index",
+      "type": "CDS",
+      "quantity": 2000000,
+      "price": 62.3,
+      "currency": "EUR",
+      "trade_date": "2026-04-17",
+      "pnl_impact": 5.8
+    },
+    {
+      "trade_id": "T1011",
+      "desk_id": "D015",
+      "instrument": "EUR Swap",
+      "type": "Derivative",
+      "quantity": 1000000,
+      "price": 1.01,
+      "currency": "EUR",
+      "trade_date": "2026-04-17",
+      "pnl_impact": 3.2
     }
   ]
 }

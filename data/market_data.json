@@ -5,14 +5,14 @@
       "market_price": 100.1,
       "source": "Bloomberg",
       "last_updated": "2026-04-12T08:00:00Z",
-      "status": "LIVE"
+      "status": "STALE"
     },
     {
       "instrument": "EUR Swap",
       "market_price": 1.01,
       "source": "Reuters",
       "last_updated": "2026-04-13T06:54:56.723Z",
-      "status": "LIVE"
+      "status": "STALE"
     },
     {
       "instrument": "AAPL",
@@ -33,7 +33,35 @@
       "market_price": 151.5,
       "source": "Bloomberg",
       "last_updated": "2026-04-12T08:45:00Z",
-      "status": "LIVE"
+      "status": "STALE"
+    },
+    {
+      "instrument": "SPX Options",
+      "market_price": 44.2,
+      "source": "CBOE",
+      "last_updated": "2026-04-16T14:00:00Z",
+      "status": "STALE"
+    },
+    {
+      "instrument": "NVDA",
+      "market_price": 905.3,
+      "source": "NASDAQ",
+      "last_updated": "2026-04-17T09:30:00Z",
+      "status": "STALE"
+    },
+    {
+      "instrument": "VIX Futures",
+      "market_price": 19.1,
+      "source": "CBOE",
+      "last_updated": "2026-04-16T15:00:00Z",
+      "status": "STALE"
+    },
+    {
+      "instrument": "CDX IG Index",
+      "market_price": 58.7,
+      "source": "Markit",
+      "last_updated": "2026-04-17T10:00:00Z",
+      "status": "STALE"
     }
   ]
 }

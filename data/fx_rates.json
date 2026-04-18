@@ -9,9 +9,9 @@
     },
     {
       "currency_pair": "EUR/USD",
-      "rate": 1.08,
+      "rate": 1.06,
       "timestamp": "2026-04-11T18:00:00Z",
-      "status": "CURRENT",
+      "status": "OLD",
       "last_updated": "2026-04-13T06:54:56.723Z"
     },
     {
